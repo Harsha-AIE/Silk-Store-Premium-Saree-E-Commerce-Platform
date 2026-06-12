@@ -8,6 +8,7 @@ import { formatPrice, getSareePrimaryImage } from '@/lib/utils';
 import { useWishlist } from './WishlistProvider';
 
 export default function ProductCard({ saree }: { saree: Saree }) {
+  console.log('Saree object:', saree);
   const imgSrc = getSareePrimaryImage(saree);
   const { isWishlisted, toggle, hydrated } = useWishlist();
   const wishlisted = hydrated && isWishlisted(saree.id);
@@ -31,6 +32,9 @@ export default function ProductCard({ saree }: { saree: Saree }) {
             alt={saree.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
+          <p style={{ color: 'red', fontSize: '10px', wordBreak: 'break-all', margin: '4px 0 0 0' }}>
+            {imgSrc}
+          </p>
           <div
             className="absolute inset-0 opacity-0 group-hover:opacity-30 transition-opacity duration-500 pointer-events-none"
             style={{

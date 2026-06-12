@@ -51,7 +51,7 @@ export default function HomeContent({
               marginBottom: '24px',
             }}
           >
-            Est. 2017 — Dharmavaram
+            Est. 2007 — Dharmavaram
           </motion.p>
           <motion.h1
             variants={fadeUp}
