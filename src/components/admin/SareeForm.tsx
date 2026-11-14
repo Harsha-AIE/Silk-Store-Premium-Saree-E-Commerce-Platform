@@ -1,10 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Category, Saree, SareeFormInput } from '@/types/database';
 import { parsePriceInput } from '@/lib/utils';
-import { createSaree, updateSaree, uploadSareeImage } from '@/lib/products/mutations';
+import {
+  createSaree,
+  updateSaree,
+  createSareeImageUpload,
+  saveSareeImageRecord,
+} from '@/lib/products/mutations';
+import { createClient } from '@/lib/supabase/client';
 import ImageUploader from './ImageUploader';
 
 type Props = {
@@ -32,6 +38,17 @@ export default function SareeForm({ categories, saree }: Props) {
   const [colorInput, setColorInput] = useState((saree?.colors ?? []).join(', '));
   const [priceInput, setPriceInput] = useState(saree?.price?.toString() ?? '');
 
+  const previews = useMemo(
+    () => pendingFiles.map(file => URL.createObjectURL(file)),
+    [pendingFiles]
+  );
+
+  useEffect(() => {
+    return () => {
+      previews.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [previews]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -40,34 +57,74 @@ export default function SareeForm({ categories, saree }: Props) {
     const input: SareeFormInput = {
       ...form,
       price: parsePriceInput(priceInput),
-      colors: colorInput.split(',').map(c => c.trim()).filter(Boolean),
+      colors: colorInput
+        .split(',')
+        .map(c => c.trim())
+        .filter(Boolean),
     };
 
     try {
+      let sareeId: string;
+      const existingImageCount = saree?.images?.length ?? 0;
+
       if (saree) {
-        const { error: err } = await updateSaree(saree.id, input);
-        if (err) throw new Error(err.message);
-        for (let i = 0; i < pendingFiles.length; i++) {
-          const { error: uploadError } = await uploadSareeImage(
-            saree.id,
-            pendingFiles[i],
-            i,
-            i === 0 && !saree.images?.length
-          );
-          if (uploadError) throw new Error(uploadError.message);
+        const { error: updateError } = await updateSaree(saree.id, input);
+
+        if (updateError) {
+          throw new Error(updateError.message);
         }
-        router.push('/admin/dashboard/sarees');
-        router.refresh();
+
+        sareeId = saree.id;
       } else {
-        const { data, error: err } = await createSaree(input);
-        if (err || !data) throw new Error(err?.message ?? 'Failed to create');
-        for (let i = 0; i < pendingFiles.length; i++) {
-          const { error: uploadError } = await uploadSareeImage(data.id, pendingFiles[i], i, i === 0);
-          if (uploadError) throw new Error(uploadError.message);
+        const { data, error: createError } = await createSaree(input);
+
+        if (createError || !data) {
+          throw new Error(createError?.message ?? 'Failed to create saree');
         }
-        router.push('/admin/dashboard/sarees');
-        router.refresh();
+
+        sareeId = data.id;
       }
+
+      const supabase = createClient();
+
+      for (let i = 0; i < pendingFiles.length; i++) {
+        const file = pendingFiles[i];
+
+        const { data: signedUpload, error: signedError } = await createSareeImageUpload(
+          sareeId,
+          file.name,
+          file.type
+        );
+
+        if (signedError || !signedUpload) {
+          throw new Error(signedError?.message ?? 'Failed to generate upload token');
+        }
+
+        const { error: uploadError } = await supabase.storage
+          .from('saree_images')
+          .uploadToSignedUrl(signedUpload.path, signedUpload.token, file, {
+            contentType: file.type,
+            cacheControl: '3600',
+          });
+
+        if (uploadError) {
+          throw new Error(uploadError.message);
+        }
+
+        const { error: saveError } = await saveSareeImageRecord(
+          sareeId,
+          signedUpload.path,
+          existingImageCount + i,
+          i === 0 && existingImageCount === 0
+        );
+
+        if (saveError) {
+          throw new Error(saveError.message);
+        }
+      }
+
+      router.push('/admin/dashboard/sarees');
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -193,7 +250,7 @@ export default function SareeForm({ categories, saree }: Props) {
         <label className="block mb-2 text-sm" style={{ color: 'rgba(248,244,236,0.6)' }}>Images</label>
         <ImageUploader
           onFiles={files => setPendingFiles(prev => [...prev, ...files])}
-          previews={pendingFiles.map(f => URL.createObjectURL(f))}
+          previews={previews}
           onRemovePreview={i => setPendingFiles(prev => prev.filter((_, idx) => idx !== i))}
         />
       </div>

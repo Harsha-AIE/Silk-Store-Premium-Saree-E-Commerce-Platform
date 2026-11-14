@@ -20,13 +20,18 @@ cp .env.local.example .env.local
    - `supabase/migrations/001_schema.sql`
    - `supabase/seed.sql` (optional categories)
 
-4. Create a **public** storage bucket named `saree-images`.
+4. Create a **public** storage bucket named `saree_images`.
 
 5. Create an admin user in Supabase Auth, then:
 
 ```sql
 INSERT INTO admins (user_id, email)
 VALUES ('<your-auth-user-uuid>', 'admin@example.com');
+```
+used:
+```sql
+
+INSERT INTO admins (user_id, email) VALUES ('123', 'admin@gmail.com');
 ```
 
 6. Start the dev server:

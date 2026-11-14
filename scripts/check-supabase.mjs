@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { lookup } from 'node:dns/promises';
 import { createClient } from '@supabase/supabase-js';
-
+import { SpeedInsights } from "@vercel/speed-insights/next"
 const root = process.cwd();
 const envFiles = ['.env', '.env.local'];
 

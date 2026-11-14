@@ -1,15 +1,12 @@
-import { createBrowserClient } from '@supabase/ssr';
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/env';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 export function createClient() {
-  const url = getSupabaseUrl();
-  const key = getSupabaseAnonKey();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
-    throw new Error(
-      'Supabase is misconfigured: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (JWT) from the same project.'
-    );
+    throw new Error('Missing Supabase environment variables.');
   }
 
-  return createBrowserClient(url, key);
+  return createSupabaseClient(url, key);
 }

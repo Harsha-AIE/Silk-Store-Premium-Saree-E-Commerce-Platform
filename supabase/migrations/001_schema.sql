@@ -122,7 +122,7 @@ CREATE POLICY "wishlist_items_public_read" ON wishlist_items FOR SELECT USING (t
 CREATE POLICY "wishlist_items_write" ON wishlist_items FOR ALL USING (true);
 
 -- Storage bucket (run in dashboard or):
--- INSERT INTO storage.buckets (id, name, public) VALUES ('saree-images', 'saree-images', true);
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('saree_images', 'saree_images', true);
 
 -- After creating admin user in Auth, add to admins:
 -- INSERT INTO admins (user_id, email) VALUES ('<auth-user-uuid>', 'admin@example.com');

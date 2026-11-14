@@ -1,5 +1,6 @@
 'use server';
 
+import { randomUUID } from 'crypto';
 import { createServiceClient } from '@/lib/supabase/service';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import type { Category, SareeFormInput } from '@/types/database';
@@ -157,12 +158,12 @@ export async function uploadCategoryImage(categoryId: string, file: File): Promi
     const path = `categories/${categoryId}/${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('saree-images')
+      .from('saree_images')
       .upload(path, file, { upsert: false });
 
     if (uploadError) return toResult(null, uploadError);
 
-    const { data: urlData } = supabase.storage.from('saree-images').getPublicUrl(path);
+    const { data: urlData } = supabase.storage.from('saree_images').getPublicUrl(path);
     const { data, error } = await supabase
       .from('categories')
       .update({ image_url: urlData.publicUrl })
@@ -176,41 +177,94 @@ export async function uploadCategoryImage(categoryId: string, file: File): Promi
   }
 }
 
-export async function uploadSareeImage(
+export async function createSareeImageUpload(
   sareeId: string,
-  file: File,
+  fileName: string,
+  contentType: string
+): Promise<MutationResult<{ path: string; token: string }>> {
+  try {
+    await requireAdmin();
+
+    const supabase = getAdminSupabase();
+
+    const allowedTypes: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/avif': 'avif',
+    };
+
+    const ext = allowedTypes[contentType];
+
+    if (!ext) {
+      throw new Error('Unsupported image format.');
+    }
+
+    const { data: saree, error: sareeError } = await supabase
+      .from('sarees')
+      .select('id')
+      .eq('id', sareeId)
+      .maybeSingle();
+
+    if (sareeError) return toResult<{ path: string; token: string }>(null, sareeError);
+
+    if (!saree) {
+      throw new Error('Saree not found.');
+    }
+
+    const path = `${sareeId}/${randomUUID()}.${ext}`;
+
+    const { data, error } = await supabase.storage.from('saree_images').createSignedUploadUrl(path);
+
+    if (error) return toResult<{ path: string; token: string }>(null, error);
+
+    return toResult({ path: data.path, token: data.token }, null);
+  } catch (error) {
+    return toResult<{ path: string; token: string }>(null, {
+      message: error instanceof Error ? error.message : 'Failed to generate upload permission',
+    });
+  }
+}
+
+export async function saveSareeImageRecord(
+  sareeId: string,
+  storagePath: string,
   sortOrder: number,
   isPrimary: boolean
 ): Promise<MutationResult> {
   try {
     await requireAdmin();
+
     const supabase = getAdminSupabase();
-    const ext = file.name.split('.').pop() ?? 'jpg';
-    const path = `${sareeId}/${Date.now()}.${ext}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('saree-images')
-      .upload(path, file, { upsert: false });
+    if (!storagePath.startsWith(`${sareeId}/`) || storagePath.includes('..')) {
+      throw new Error('Invalid image storage path.');
+    }
 
-    if (uploadError) return toResult(null, uploadError);
-
-    const { data: urlData } = supabase.storage.from('saree-images').getPublicUrl(path);
+    const { data: urlData } = supabase.storage.from('saree_images').getPublicUrl(storagePath);
 
     const { data, error } = await supabase
       .from('saree_images')
       .insert({
         saree_id: sareeId,
         url: urlData.publicUrl,
-        storage_path: path,
+        storage_path: storagePath,
         sort_order: sortOrder,
         is_primary: isPrimary,
       })
       .select()
       .single();
 
-    return toResult(data, error);
+    if (error) {
+      await supabase.storage.from('saree_images').remove([storagePath]);
+      return toResult(null, error);
+    }
+
+    return toResult(data, null);
   } catch (error) {
-    return toResult(null, { message: error instanceof Error ? error.message : 'Failed to upload saree image' });
+    return toResult(null, {
+      message: error instanceof Error ? error.message : 'Failed to save image details',
+    });
   }
 }
 
@@ -222,7 +276,7 @@ export async function deleteSareeImage(
     await requireAdmin();
     const supabase = getAdminSupabase();
     if (storagePath) {
-      const { error } = await supabase.storage.from('saree-images').remove([storagePath]);
+      const { error } = await supabase.storage.from('saree_images').remove([storagePath]);
       if (error) return toResult(null, error);
     }
 
