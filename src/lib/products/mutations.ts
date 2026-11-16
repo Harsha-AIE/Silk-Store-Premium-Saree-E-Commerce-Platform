@@ -116,9 +116,9 @@ export async function createSaree(input: SareeFormInput): Promise<MutationResult
         .select('id')
         .single();
       if (!error) return toResult(data, null);
-      if (error.code !== '23505') return toResult(null, error);
+      if (error.code !== '23505') return toResult<{ id: string }>(null, error);
     }
-    return toResult(null, { message: 'Unable to generate a unique saree URL. Please retry.' });
+    return toResult<{ id: string }>(null, { message: 'Unable to generate a unique saree URL. Please retry.' });
   } catch (error) {
     return toResult<{ id: string }>(
       null,
