@@ -2,22 +2,27 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, FolderOpen, Shirt, LogOut } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Shirt, Users, LogOut } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/ToastProvider';
 
 const links = [
   { href: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard },
   { href: '/admin/dashboard/categories', label: 'Categories', icon: FolderOpen },
   { href: '/admin/dashboard/sarees', label: 'Sarees', icon: Shirt },
+  { href: '/admin/dashboard/customers', label: 'Customers', icon: Users },
 ];
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { notify } = useToast();
 
   async function handleSignOut() {
     const supabase = createClient();
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) { notify(error.message, 'error'); return; }
+    notify('Admin signed out successfully.', 'success');
     router.push('/admin/login');
     router.refresh();
   }

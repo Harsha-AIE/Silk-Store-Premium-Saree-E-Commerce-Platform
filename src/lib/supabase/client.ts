@@ -1,12 +1,16 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+'use client';
 
+import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/env';
+
+/** Browser auth and server auth now share the same Supabase cookie session. */
 export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
 
   if (!url || !key) {
-    throw new Error('Missing Supabase environment variables.');
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or Supabase public key.');
   }
 
-  return createSupabaseClient(url, key);
+  return createBrowserClient(url, key);
 }

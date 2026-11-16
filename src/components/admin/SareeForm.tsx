@@ -9,9 +9,13 @@ import {
   updateSaree,
   createSareeImageUpload,
   saveSareeImageRecord,
+  deleteSareeImage,
 } from '@/lib/products/mutations';
 import { createClient } from '@/lib/supabase/client';
 import ImageUploader from './ImageUploader';
+import { Trash2 } from 'lucide-react';
+import { useToast } from '@/components/ui/ToastProvider';
+import type { SareeImage } from '@/types/database';
 
 type Props = {
   categories: Category[];
@@ -20,6 +24,9 @@ type Props = {
 
 export default function SareeForm({ categories, saree }: Props) {
   const router = useRouter();
+  const { notify } = useToast();
+  const [existingImages, setExistingImages] = useState<SareeImage[]>(() => [...(saree?.images ?? [])].sort((a, b) => a.sort_order - b.sort_order));
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -49,6 +56,24 @@ export default function SareeForm({ categories, saree }: Props) {
     };
   }, [previews]);
 
+  async function removeExistingPhoto(image: SareeImage) {
+    if (!window.confirm('Remove this photo from the saree?')) return;
+    setDeletingImageId(image.id);
+    try {
+      const { error } = await deleteSareeImage(image.id, image.storage_path);
+      if (error) throw new Error(error.message);
+      setExistingImages(current => current.filter(item => item.id !== image.id));
+      notify('Saree photo removed successfully.', 'success');
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to remove photo.';
+      setError(message);
+      notify(`Photo removal failed: ${message}`, 'error');
+    } finally {
+      setDeletingImageId(null);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -65,7 +90,7 @@ export default function SareeForm({ categories, saree }: Props) {
 
     try {
       let sareeId: string;
-      const existingImageCount = saree?.images?.length ?? 0;
+      const existingImageCount = existingImages.length ? Math.max(...existingImages.map(img => img.sort_order)) + 1 : 0;
 
       if (saree) {
         const { error: updateError } = await updateSaree(saree.id, input);
@@ -123,10 +148,13 @@ export default function SareeForm({ categories, saree }: Props) {
         }
       }
 
+      notify(saree ? 'Saree updated successfully.' : 'Saree created successfully.', 'success');
       router.push('/admin/dashboard/sarees');
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      setError(message);
+      notify(`Saree could not be saved: ${message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -248,6 +276,21 @@ export default function SareeForm({ categories, saree }: Props) {
 
       <div>
         <label className="block mb-2 text-sm" style={{ color: 'rgba(248,244,236,0.6)' }}>Images</label>
+        {existingImages.length > 0 && (
+          <div className="mb-5">
+            <p className="mb-2 text-sm" style={{ color: '#C8A96B' }}>Current saree photos ({existingImages.length})</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {existingImages.map((image, i) => (
+                <div key={image.id} className="relative rounded-lg overflow-hidden aspect-square" style={{ border: image.is_primary ? '2px solid #C8A96B' : '1px solid #333' }}>
+                  <img src={image.url} alt={`Existing saree photo ${i + 1}`} className="w-full h-full object-cover" />
+                  {image.is_primary && <span className="absolute bottom-1 left-1 text-xs px-2 py-1 rounded" style={{ background: '#111', color: '#C8A96B' }}>Main photo</span>}
+                  <button type="button" aria-label={`Delete photo ${i + 1}`} disabled={deletingImageId !== null} onClick={() => void removeExistingPhoto(image)} className="absolute top-2 right-2 p-2 rounded-full disabled:opacity-50" style={{ background: 'rgba(0,0,0,0.8)', color: '#fff' }}><Trash2 size={15} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <p className="text-xs mb-2" style={{ color: 'rgba(248,244,236,0.55)' }}>Add more photos below; existing photos remain unless you remove them.</p>
         <ImageUploader
           onFiles={files => setPendingFiles(prev => [...prev, ...files])}
           previews={previews}

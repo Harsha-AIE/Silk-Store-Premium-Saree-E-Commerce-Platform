@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, MessageCircle, Heart } from 'lucide-react';
+import { Menu, X, MessageCircle, Heart, UserRound, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { buildContactUrl } from '@/lib/whatsapp';
 import { useWishlist } from './WishlistProvider';
@@ -20,7 +20,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();
-  const { count, hydrated } = useWishlist();
+  const { count, hydrated, user, authReady, requestLogin, signOut } = useWishlist();
   const contactUrl = buildContactUrl();
 
   useEffect(() => {
@@ -110,6 +110,22 @@ export default function Navbar() {
                 </span>
               )}
             </Link>
+            {authReady && (user ? (
+              <div className="flex items-center gap-2" style={{ color: '#C8A96B' }}>
+                <span className="text-xs max-w-[130px] truncate" title={user.email ?? 'My account'}>
+                  {user.email ?? 'My account'}
+                </span>
+                <button type="button" onClick={() => void signOut()} title="Sign out"
+                  aria-label="Sign out" className="flex items-center gap-1 text-xs">
+                  <LogOut size={17} />
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={requestLogin}
+                className="flex items-center gap-1 text-xs" style={{ color: '#C8A96B' }}>
+                <UserRound size={19} /> Login
+              </button>
+            ))}
             <a
               href={contactUrl}
               target="_blank"
@@ -161,6 +177,22 @@ export default function Navbar() {
                 <button type="button" onClick={() => setDrawerOpen(false)} style={{ color: '#C8A96B' }}>
                   <X size={22} />
                 </button>
+              </div>
+              <div className="px-6 pt-4">
+                {authReady && (user ? (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-sm break-all" style={{ color: '#C8A96B' }}>{user.email}</span>
+                    <button type="button" onClick={() => { setDrawerOpen(false); void signOut(); }}
+                      className="flex items-center gap-2 text-sm" style={{ color: '#F8F4EC' }}>
+                      <LogOut size={17} /> Sign out
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => { setDrawerOpen(false); requestLogin(); }}
+                    className="flex items-center gap-2 text-sm" style={{ color: '#C8A96B' }}>
+                    <UserRound size={19} /> Customer Login / Signup
+                  </button>
+                ))}
               </div>
               <div className="flex flex-col gap-1 px-6 mt-4">
                 {[...navLinks, { label: 'Contact', href: contactUrl, external: true }].map((link, i) =>

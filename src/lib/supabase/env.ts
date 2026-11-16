@@ -69,7 +69,7 @@ export function diagnoseSupabaseEnv(): SupabaseEnvDiagnostics {
 /** Public key used by browser/server SSR Supabase clients. */
 export function getSupabaseAnonKey(): string {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
-  if (anon.startsWith('eyJ')) return anon;
+  if (anon.startsWith('eyJ') || anon.startsWith('sb_publishable_')) return anon;
 
   const publishable = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? '';
   if (publishable.startsWith('sb_publishable_')) return publishable;

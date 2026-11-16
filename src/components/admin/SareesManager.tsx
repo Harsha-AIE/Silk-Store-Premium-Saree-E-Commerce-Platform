@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { useToast } from '@/components/ui/ToastProvider';
+import { Plus, Search, Pencil, Trash2, Layers } from 'lucide-react';
 import type { Category, Saree } from '@/types/database';
 import { deleteSaree, updateSaree } from '@/lib/products/mutations';
 import { formatPrice, getSareePrimaryImage } from '@/lib/utils';
@@ -16,6 +17,7 @@ export default function SareesManager({
   categories: Category[];
 }) {
   const router = useRouter();
+  const { notify } = useToast();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
@@ -43,8 +45,10 @@ export default function SareesManager({
     const { error } = await updateSaree(saree.id, { published: !saree.published });
     if (error) {
       setError(error.message);
+      notify(error.message, 'error');
       return;
     }
+    notify('Saree status updated successfully.', 'success');
     router.refresh();
   }
 
@@ -54,8 +58,10 @@ export default function SareesManager({
     const { error } = await deleteSaree(id);
     if (error) {
       setError(error.message);
+      notify(error.message, 'error');
       return;
     }
+    notify('Saree deleted successfully.', 'success');
     router.refresh();
   }
 
@@ -63,6 +69,10 @@ export default function SareesManager({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 style={{ fontSize: '32px', color: '#C8A96B', fontWeight: 400 }}>Sarees</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/admin/dashboard/sarees/bulk" className="no-underline inline-flex items-center gap-2 px-5 py-2.5 rounded-md" style={{ border: '1px solid #C8A96B', color: '#C8A96B', fontSize: '13px', textTransform: 'uppercase' }}>
+            <Layers size={16} /> Bulk add (same category)
+          </Link>
         <Link
           href="/admin/dashboard/sarees/new"
           className="no-underline inline-flex items-center gap-2 px-5 py-2.5 rounded-md"
@@ -71,6 +81,7 @@ export default function SareesManager({
           <Plus size={16} />
           Add Saree
         </Link>
+        </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-3">

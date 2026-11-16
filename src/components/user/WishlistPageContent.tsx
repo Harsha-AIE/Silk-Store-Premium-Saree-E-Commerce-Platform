@@ -10,9 +10,11 @@ import { buildWishlistShareUrl } from '@/lib/whatsapp';
 import { useWishlist } from './WishlistProvider';
 import ProductCard from './ProductCard';
 import { getSiteUrl } from '@/lib/config';
+import { useToast } from '@/components/ui/ToastProvider';
 
 export default function WishlistPageContent() {
-  const { sareeIds, shareToken, count, remove, syncShare, hydrated } = useWishlist();
+  const { sareeIds, shareToken, count, remove, syncShare, hydrated, user, requestLogin } = useWishlist();
+  const { notify } = useToast();
   const [allSarees, setAllSarees] = useState<Saree[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,14 +30,21 @@ export default function WishlistPageContent() {
   const shareLink = shareToken ? `${getSiteUrl()}/wishlist/${shareToken}` : '';
 
   async function handleShareWhatsApp() {
-    await syncShare();
-    if (!shareToken) return;
-    window.open(buildWishlistShareUrl(shareToken), '_blank', 'noopener,noreferrer');
+    if (!(await syncShare()) || !shareToken) { if (user) notify('Wishlist link is not ready yet. Please retry.', 'error'); return; }
+    const popup = window.open(buildWishlistShareUrl(shareToken), '_blank', 'noopener,noreferrer');
+    if (!popup) notify('Please allow pop-ups to share through WhatsApp.', 'error');
+    else notify('Opening WhatsApp to share your wishlist.', 'success');
   }
 
   async function handleCopyLink() {
-    await syncShare();
-    if (shareLink) await navigator.clipboard.writeText(shareLink);
+    if (!(await syncShare())) { if (user) notify('Wishlist link is not ready yet. Please retry.', 'error'); return; }
+    if (!shareLink) { notify('No wishlist share link is available.', 'error'); return; }
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      notify('Wishlist link copied to clipboard!', 'success');
+    } catch {
+      notify('Could not copy the link. Please copy the share link shown below.', 'error');
+    }
   }
 
   if (!hydrated || loading) {
@@ -80,11 +89,23 @@ export default function WishlistPageContent() {
 
       {count === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-24">
-          <p style={{ fontSize: '28px', color: '#C8A96B', marginBottom: 16 }}>Your wishlist is empty</p>
-          <p style={{ color: 'rgba(248,244,236,0.5)', marginBottom: 32 }}>Browse collections and save sarees you love</p>
-          <Link href="/collections" className="no-underline" style={{ border: '1px solid #C8A96B', color: '#C8A96B', padding: '12px 32px', textTransform: 'uppercase', fontSize: '13px', letterSpacing: '2px' }}>
-            Explore Collections
-          </Link>
+          <p style={{ fontSize: '28px', color: '#C8A96B', marginBottom: 16 }}>
+            {user ? 'Your wishlist is empty' : 'Login to see your saved wishlist'}
+          </p>
+          <p style={{ color: 'rgba(248,244,236,0.5)', marginBottom: 32 }}>
+            {user ? 'Browse collections and save sarees you love' : 'Your wishlist is saved to your account, not this device.'}
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            {!user && (
+              <button type="button" onClick={requestLogin} className="rounded-md"
+                style={{ backgroundColor: '#C8A96B', color: '#0B0B0B', padding: '12px 32px', textTransform: 'uppercase', fontSize: '13px' }}>
+                Customer Login
+              </button>
+            )}
+            <Link href="/collections" className="no-underline rounded-md" style={{ border: '1px solid #C8A96B', color: '#C8A96B', padding: '12px 32px', textTransform: 'uppercase', fontSize: '13px', letterSpacing: '2px' }}>
+              Explore Collections
+            </Link>
+          </div>
         </motion.div>
       ) : (
         <>

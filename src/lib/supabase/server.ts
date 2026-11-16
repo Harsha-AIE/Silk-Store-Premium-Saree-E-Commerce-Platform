@@ -4,8 +4,8 @@ import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/env';
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
 
   if (!url || !key) {
     throw new Error('Supabase URL or JWT anon key missing — check .env.local');

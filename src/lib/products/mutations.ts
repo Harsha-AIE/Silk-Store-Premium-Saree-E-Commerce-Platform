@@ -100,19 +100,25 @@ export async function createSaree(input: SareeFormInput): Promise<MutationResult
   try {
     await requireAdmin();
     const supabase = getAdminSupabase();
-    const slug = slugify(input.title);
-    const { data, error } = await supabase
-      .from('sarees')
-      .insert({
-        ...input,
-        category_id: input.category_id || null,
-        slug,
-        colors: input.colors,
-      })
-      .select('id')
-      .single();
-
-    return toResult(data, error);
+    // Two sarees can legitimately have the same display title. Keep the clean
+    // slug where possible; on a unique collision assign a short random suffix.
+    const baseSlug = slugify(input.title) || 'saree';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const slug = attempt === 0 ? baseSlug : `${baseSlug}-${randomUUID().slice(0, 8)}`;
+      const { data, error } = await supabase
+        .from('sarees')
+        .insert({
+          ...input,
+          category_id: input.category_id || null,
+          slug,
+          colors: input.colors,
+        })
+        .select('id')
+        .single();
+      if (!error) return toResult(data, null);
+      if (error.code !== '23505') return toResult(null, error);
+    }
+    return toResult(null, { message: 'Unable to generate a unique saree URL. Please retry.' });
   } catch (error) {
     return toResult<{ id: string }>(
       null,

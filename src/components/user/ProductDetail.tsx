@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Heart } from 'lucide-react';
+import { Heart, Expand, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { Saree } from '@/types/database';
 import { formatPrice, getSareePrimaryImage } from '@/lib/utils';
 import { buildProductInquiryUrl } from '@/lib/whatsapp';
@@ -23,7 +24,27 @@ export default function ProductDetail({
       })
     : [{ url: getSareePrimaryImage(saree), id: '0' }];
 
-  const mainImg = images[0]?.url ?? getSareePrimaryImage(saree);
+  const [selectedImage, setSelectedImage] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const activeImage = images[selectedImage] ?? images[0];
+  const showPrevious = () => setSelectedImage(current => (current - 1 + images.length) % images.length);
+  const showNext = () => setSelectedImage(current => (current + 1) % images.length);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLightboxOpen(false);
+      if (event.key === 'ArrowLeft') setSelectedImage(current => (current - 1 + images.length) % images.length);
+      if (event.key === 'ArrowRight') setSelectedImage(current => (current + 1) % images.length);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [lightboxOpen, images.length]);
   const { isWishlisted, toggle, hydrated } = useWishlist();
   const wishlisted = hydrated && isWishlisted(saree.id);
   const whatsappUrl = buildProductInquiryUrl(saree.slug, saree.title);
@@ -34,15 +55,26 @@ export default function ProductDetail({
       <div className="max-w-6xl mx-auto px-6 py-16 pt-24">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7 }}>
-            <div className="rounded-lg overflow-hidden" style={{ aspectRatio: '3/4' }}>
-              <img src={mainImg} alt={saree.title} className="w-full h-full object-cover" />
+            <div className="relative group rounded-lg overflow-hidden" style={{ aspectRatio: '3/4' }}>
+              <button type="button" onClick={() => setLightboxOpen(true)} aria-label="View saree photo in full screen" className="block w-full h-full" title="Expand image">
+                <img src={activeImage?.url} alt={`${saree.title} – photo ${selectedImage + 1}`} className="w-full h-full object-cover" />
+              </button>
+              <button type="button" onClick={() => setLightboxOpen(true)} aria-label="Open full screen" className="absolute right-3 top-3 flex items-center gap-2 px-3 py-2 rounded-md" style={{ backgroundColor: 'rgba(0,0,0,0.75)', color: '#F8F4EC' }}>
+                <Expand size={20} />
+              </button>
+              {images.length > 1 && (
+                <>
+                  <button type="button" onClick={showPrevious} aria-label="Previous photo" className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.65)' }}><ChevronLeft size={22} /></button>
+                  <button type="button" onClick={showNext} aria-label="Next photo" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.65)' }}><ChevronRight size={22} /></button>
+                </>
+              )}
             </div>
             {images.length > 1 && (
-              <div className="grid grid-cols-4 gap-2 mt-3">
-                {images.slice(0, 4).map((img, i) => (
-                  <div key={img.id ?? i} className="rounded-md overflow-hidden" style={{ aspectRatio: '1/1' }}>
-                    <img src={img.url} alt="" className="w-full h-full object-cover" style={{ opacity: i === 0 ? 1 : 0.5 }} />
-                  </div>
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 mt-3">
+                {images.map((img, i) => (
+                  <button type="button" key={img.id ?? i} onClick={() => setSelectedImage(i)} aria-label={`Show photo ${i + 1}`} aria-pressed={selectedImage === i} className="rounded-md overflow-hidden" style={{ aspectRatio: '1/1', border: selectedImage === i ? '2px solid #C8A96B' : '2px solid transparent' }}>
+                    <img src={img.url} alt={`${saree.title} thumbnail ${i + 1}`} className="w-full h-full object-cover" style={{ opacity: selectedImage === i ? 1 : 0.65 }} />
+                  </button>
                 ))}
               </div>
             )}
@@ -140,6 +172,20 @@ export default function ProductDetail({
             </Link>
           </motion.div>
         </div>
+
+        {lightboxOpen && (
+          <div role="dialog" aria-modal="true" aria-label="Full screen saree photos" className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.97)' }} onClick={() => setLightboxOpen(false)}>
+            <button type="button" onClick={() => setLightboxOpen(false)} aria-label="Close full screen" className="absolute right-5 top-5 p-2 z-10" style={{ color: '#F8F4EC' }}><X size={28} /></button>
+            <img src={activeImage?.url} alt={`${saree.title} photo ${selectedImage + 1}`} className="max-h-[88vh] max-w-[90vw] object-contain" onClick={e => e.stopPropagation()} />
+            {images.length > 1 && (
+              <>
+                <button type="button" aria-label="Previous photo" onClick={e => { e.stopPropagation(); showPrevious(); }} className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full" style={{ background: '#262626' }}><ChevronLeft size={28} /></button>
+                <button type="button" aria-label="Next photo" onClick={e => { e.stopPropagation(); showNext(); }} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full" style={{ background: '#262626' }}><ChevronRight size={28} /></button>
+                <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm" style={{ color: '#C8A96B' }}>{selectedImage + 1} / {images.length}</span>
+              </>
+            )}
+          </div>
+        )}
 
         {related.length > 0 && (
           <div className="mt-20">
